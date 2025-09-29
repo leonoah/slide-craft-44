@@ -26,22 +26,20 @@ const Preview = () => {
     setIsExporting(true);
     try {
       const pptx = new PptxGenJS();
-      
+
       // Group placeholders by slide
       const slideGroups = currentFile.placeholders.reduce((acc, placeholder) => {
         const slideIndex = placeholder.slideIndex;
-        if (!acc[slideIndex]) {
-          acc[slideIndex] = [];
-        }
+        if (!acc[slideIndex]) acc[slideIndex] = [];
         acc[slideIndex].push(placeholder);
         return acc;
       }, {} as Record<number, typeof currentFile.placeholders>);
 
       // Create slides with updated content
-      Object.entries(slideGroups).forEach(([slideIndex, placeholders]) => {
+      Object.entries(slideGroups).forEach(([_, placeholders]) => {
         const slide = pptx.addSlide();
-        
-        // Add slide title
+
+        // Add slide title if available
         const firstPlaceholder = placeholders[0];
         if (firstPlaceholder?.slideTitle) {
           slide.addText(firstPlaceholder.slideTitle, {
@@ -51,40 +49,65 @@ const Preview = () => {
             h: 1,
             fontSize: 24,
             bold: true,
-            color: "363636"
+            color: "363636",
           });
         }
 
-        // Add placeholder content
-        placeholders.forEach((placeholder, index) => {
-          const value = updates[placeholder.id]?.value || `[${placeholder.key}]`;
-          const yPos = 1.5 + (index * 0.8);
-          
+        // Dynamic y-positioning
+        let y = firstPlaceholder?.slideTitle ? 1.6 : 0.8;
+
+        placeholders.forEach((placeholder) => {
+          const update = updates[placeholder.id]?.value;
+
           if (placeholder.type === 'text') {
-            slide.addText(`${placeholder.key}: ${value}`, {
+            const textValue = update || `[${placeholder.key}]`;
+            slide.addText(`${placeholder.key}: ${textValue}`, {
               x: 0.5,
-              y: yPos,
-              w: 9,
-              h: 0.7,
-              fontSize: 14,
-              color: "363636"
-            });
-          } else if (placeholder.type === 'image') {
-            slide.addText(`${placeholder.key}: ${value ? 'Image uploaded' : '[Image placeholder]'}`, {
-              x: 0.5,
-              y: yPos,
+              y,
               w: 9,
               h: 0.7,
               fontSize: 14,
               color: "363636",
-              italic: true
             });
+            y += 0.6;
+          } else if (placeholder.type === 'image') {
+            // If image exists, embed it; otherwise show placeholder text
+            if (update && update.startsWith('data:image')) {
+              // Optional label
+              slide.addText(`${placeholder.key}:`, {
+                x: 0.5,
+                y,
+                w: 9,
+                h: 0.5,
+                fontSize: 12,
+                color: "363636",
+                italic: true,
+              });
+              y += 0.4;
+
+              // Add image (fit within slide width)
+              slide.addImage({ data: update, x: 0.5, y, w: 5.5, h: 3.2 });
+              y += 3.6; // spacing after image
+            } else {
+              slide.addText(`${placeholder.key}: [Image placeholder]`, {
+                x: 0.5,
+                y,
+                w: 9,
+                h: 0.7,
+                fontSize: 14,
+                color: "777777",
+                italic: true,
+              });
+              y += 0.6;
+            }
           }
         });
       });
 
-      // Save the presentation
-      const fileName = currentFile.filename.replace('.pptx', '') + '_updated.pptx';
+      // Save using original filename
+      const fileName = currentFile.filename.endsWith('.pptx')
+        ? currentFile.filename
+        : `${currentFile.filename}.pptx`;
       await pptx.writeFile({ fileName });
 
       toast({
@@ -107,12 +130,12 @@ const Preview = () => {
     setIsExporting(true);
     try {
       const pdf = new jsPDF();
-      
+
       // Add title
       pdf.setFontSize(20);
       pdf.setFont(undefined, 'bold');
       pdf.text('PowerPoint Placeholder Report', 20, 30);
-      
+
       // Add file info
       pdf.setFontSize(12);
       pdf.setFont(undefined, 'normal');
@@ -121,45 +144,71 @@ const Preview = () => {
       pdf.text(`Total Placeholders: ${currentFile.placeholders.length}`, 20, 70);
       pdf.text(`Completed: ${filledCount}`, 20, 80);
       pdf.text(`Remaining: ${currentFile.placeholders.length - filledCount}`, 20, 90);
-      
+
       // Add placeholder details
       pdf.setFont(undefined, 'bold');
       pdf.text('Placeholder Details:', 20, 110);
-      
+
       let yPos = 125;
       pdf.setFont(undefined, 'normal');
       pdf.setFontSize(10);
-      
-      currentFile.placeholders.forEach((placeholder) => {
-        if (yPos > 270) {
+
+      const addNewPageIfNeeded = (neededHeight: number) => {
+        if (yPos + neededHeight > 285) {
           pdf.addPage();
           yPos = 30;
         }
-        
-        const status = updates[placeholder.id]?.value ? 'FILLED' : 'EMPTY';
-        const value = updates[placeholder.id]?.value || '[Empty]';
-        
+      };
+
+      currentFile.placeholders.forEach((placeholder) => {
+        const update = updates[placeholder.id]?.value;
+        const status = update ? 'FILLED' : 'EMPTY';
+
+        addNewPageIfNeeded(20);
         pdf.setFont(undefined, 'bold');
         pdf.text(`${placeholder.key} (${placeholder.type}) - Slide ${placeholder.slideIndex + 1}:`, 20, yPos);
         pdf.setFont(undefined, 'normal');
         pdf.text(`Status: ${status}`, 25, yPos + 8);
-        
-        if (placeholder.type === 'text' && updates[placeholder.id]?.value) {
-          const lines = pdf.splitTextToSize(`Content: ${value}`, 160);
-          pdf.text(lines, 25, yPos + 16);
-          yPos += 16 + (lines.length * 5);
+        yPos += 14;
+
+        if (placeholder.type === 'text' && update) {
+          const lines = pdf.splitTextToSize(`Content: ${update}`, 170);
+          addNewPageIfNeeded(lines.length * 5 + 10);
+          pdf.text(lines, 25, yPos);
+          yPos += (lines.length * 5) + 10;
         } else if (placeholder.type === 'image') {
-          pdf.text(`Content: ${status === 'FILLED' ? 'Image uploaded' : 'No image'}`, 25, yPos + 16);
-          yPos += 24;
-        } else {
-          yPos += 20;
+          if (update && update.startsWith('data:image')) {
+            // Detect image type from data URL
+            const mime = update.substring(update.indexOf(':') + 1, update.indexOf(';')).toUpperCase();
+            // Common types map
+            const type = mime.includes('PNG') ? 'PNG' : mime.includes('JPEG') || mime.includes('JPG') ? 'JPEG' : mime.includes('WEBP') ? 'WEBP' : 'PNG';
+            const imgWidth = 160; // mm
+            const imgHeight = 90; // mm, approx 16:9
+            addNewPageIfNeeded(imgHeight + 10);
+            try {
+              pdf.addImage(update, type as any, 25, yPos, imgWidth, imgHeight);
+              yPos += imgHeight + 8;
+            } catch (e) {
+              // Fallback to text if addImage fails
+              const lines = pdf.splitTextToSize(`Content: [Image could not be embedded]`, 170);
+              addNewPageIfNeeded(lines.length * 5 + 10);
+              pdf.text(lines, 25, yPos);
+              yPos += (lines.length * 5) + 10;
+            }
+          } else {
+            const lines = pdf.splitTextToSize(`Content: No image`, 170);
+            addNewPageIfNeeded(lines.length * 5 + 10);
+            pdf.text(lines, 25, yPos);
+            yPos += (lines.length * 5) + 10;
+          }
         }
-        
-        yPos += 5; // spacing between items
+
+        yPos += 4; // spacing between items
       });
-      
-      // Save the PDF
-      const fileName = currentFile.filename.replace('.pptx', '') + '_report.pdf';
+
+      // Save the PDF with original base name
+      const base = currentFile.filename.replace(/\.pptx$/i, '');
+      const fileName = `${base}.pdf`;
       pdf.save(fileName);
 
       toast({
