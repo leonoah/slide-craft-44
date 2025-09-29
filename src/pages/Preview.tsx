@@ -1,75 +1,109 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  Download, 
-  FileText, 
-  Image, 
-  ArrowLeft, 
-  CheckCircle, 
-  AlertCircle,
-  Eye,
-  Grid3X3
-} from "lucide-react";
+import { Download, ArrowLeft, Grid3X3, List, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock data for slides preview
-const mockSlides = [
-  {
-    id: 1,
-    title: "Introduction",
-    thumbnail: "/placeholder-slide.jpg",
-    placeholders: [
-      { key: "title", status: "filled" as const, type: "text" as const },
-      { key: "subtitle", status: "filled" as const, type: "text" as const },
-      { key: "image:hero", status: "empty" as const, type: "image" as const }
-    ]
-  },
-  {
-    id: 2,
-    title: "Features",
-    thumbnail: "/placeholder-slide.jpg",
-    placeholders: [
-      { key: "bullet_1", status: "empty" as const, type: "text" as const },
-      { key: "image:feature", status: "empty" as const, type: "image" as const }
-    ]
-  },
-  {
-    id: 3,
-    title: "Conclusion",
-    thumbnail: "/placeholder-slide.jpg",
-    placeholders: [
-      { key: "closing_text", status: "filled" as const, type: "text" as const }
-    ]
-  }
-];
+import { usePPTXStore } from "@/store/pptx-store";
 
 const Preview = () => {
-  const [isExporting, setIsExporting] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [isExporting, setIsExporting] = useState(false);
+  const { currentFile, updates } = usePPTXStore();
 
-  const totalPlaceholders = mockSlides.reduce((acc, slide) => acc + slide.placeholders.length, 0);
-  const filledPlaceholders = mockSlides.reduce(
-    (acc, slide) => acc + slide.placeholders.filter(p => p.status === "filled").length, 
-    0
-  );
-  const completionRate = Math.round((filledPlaceholders / totalPlaceholders) * 100);
+  if (!currentFile) {
+    navigate('/');
+    return null;
+  }
 
-  const handleExport = async (format: "pptx" | "pdf") => {
+  const filledCount = currentFile.placeholders.filter(p => updates[p.id]?.value).length;
+
+  const handleExportPPTX = async () => {
     setIsExporting(true);
-    
-    // Simulate export process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    toast({
-      title: `${format.toUpperCase()} exported successfully!`,
-      description: "Your file is ready for download",
-    });
-    
-    setIsExporting(false);
+    try {
+      // Create a simple text file with the placeholder data for now
+      const exportData = {
+        filename: currentFile.filename,
+        slides: currentFile.slideCount,
+        placeholders: currentFile.placeholders.map(p => ({
+          key: p.key,
+          type: p.type,
+          slideIndex: p.slideIndex,
+          value: updates[p.id]?.value || '',
+          filled: !!updates[p.id]?.value
+        }))
+      };
+
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentFile.filename.replace('.pptx', '')}_data.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export completed",
+        description: "Placeholder data exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Unable to export file",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      // Create a simple text summary for PDF export
+      const summary = `PowerPoint Placeholder Summary
+      
+Filename: ${currentFile.filename}
+Slides: ${currentFile.slideCount}
+Total Placeholders: ${currentFile.placeholders.length}
+Completed: ${filledCount}
+Remaining: ${currentFile.placeholders.length - filledCount}
+
+Placeholder Details:
+${currentFile.placeholders.map(p => 
+  `- ${p.key} (${p.type}) - Slide ${p.slideIndex + 1}: ${updates[p.id]?.value ? 'FILLED' : 'EMPTY'}`
+).join('\n')}`;
+
+      const blob = new Blob([summary], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${currentFile.filename.replace('.pptx', '')}_summary.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export completed",
+        description: "Summary exported successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Unable to export summary",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -83,27 +117,17 @@ const Preview = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/placeholders')}
-                className="glass-button"
+                className="glass-button hover-glow"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Editor
               </Button>
               
-              <div className="glass-card px-4 py-2">
-                <span className="font-semibold">presentation.pptx</span>
-              </div>
-              
-              <div className="glass-card px-4 py-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className={`w-2 h-2 rounded-full ${
-                    completionRate === 100 ? "bg-green-500" : 
-                    completionRate > 50 ? "bg-yellow-500" : "bg-red-500"
-                  }`} />
-                  <span>{completionRate}% Complete</span>
-                  <span className="text-muted-foreground">
-                    ({filledPlaceholders}/{totalPlaceholders} placeholders)
-                  </span>
-                </div>
+              <div>
+                <h1 className="text-xl font-bold gradient-text">Preview & Export</h1>
+                <p className="text-sm text-muted-foreground">
+                  {currentFile.filename} • {currentFile.slideCount} slides • {filledCount}/{currentFile.placeholders.length} completed
+                </p>
               </div>
             </div>
             
@@ -123,27 +147,27 @@ const Preview = () => {
                   onClick={() => setViewMode("list")}
                   className="p-2"
                 >
-                  <Eye className="w-4 h-4" />
+                  <List className="w-4 h-4" />
                 </Button>
               </div>
               
-              <Button
-                onClick={() => handleExport("pptx")}
+              <Button 
+                onClick={handleExportPPTX} 
                 disabled={isExporting}
                 className="glass-button hover-glow"
               >
                 <Download className="w-4 h-4 mr-2" />
-                Export PPTX
+                {isExporting ? 'Exporting...' : 'Export Data (JSON)'}
               </Button>
               
-              <Button
-                variant="outline"
-                onClick={() => handleExport("pdf")}
+              <Button 
+                onClick={handleExportPDF} 
+                variant="outline" 
                 disabled={isExporting}
                 className="glass-button"
               >
                 <FileText className="w-4 h-4 mr-2" />
-                Export PDF
+                {isExporting ? 'Exporting...' : 'Export Summary (TXT)'}
               </Button>
             </div>
           </div>
@@ -156,106 +180,47 @@ const Preview = () => {
           <div className="glass-card p-8 text-center space-y-4">
             <div className="w-16 h-16 mx-auto rounded-full glass border-4 border-primary/20 border-t-primary animate-spin" />
             <div>
-              <h3 className="text-lg font-semibold mb-2">Exporting your presentation...</h3>
-              <p className="text-muted-foreground">This might take a moment</p>
+              <h3 className="text-lg font-semibold mb-2">Exporting your data...</h3>
+              <p className="text-muted-foreground">This will download shortly</p>
             </div>
           </div>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto p-6">
-        {/* Overview Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8 animate-fade-in">
-          <div className="glass-card text-center">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-              <Eye className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="font-semibold mb-2">Preview Ready</h3>
-            <p className="text-sm text-muted-foreground">
-              Review your slides before exporting
-            </p>
-          </div>
-          
-          <div className="glass-card text-center">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-green-100 flex items-center justify-center mb-4">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="font-semibold mb-2">{filledPlaceholders} Completed</h3>
-            <p className="text-sm text-muted-foreground">
-              Out of {totalPlaceholders} total placeholders
-            </p>
-          </div>
-          
-          <div className="glass-card text-center">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-yellow-100 flex items-center justify-center mb-4">
-              <AlertCircle className="w-6 h-6 text-yellow-600" />
-            </div>
-            <h3 className="font-semibold mb-2">{totalPlaceholders - filledPlaceholders} Pending</h3>
-            <p className="text-sm text-muted-foreground">
-              Placeholders still need content
-            </p>
-          </div>
-        </div>
-
-        {/* Slides Preview */}
+        {/* Main Content */}
         <div className="animate-slide-up">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Slide Preview</h1>
-            <p className="text-muted-foreground">
-              {mockSlides.length} slides total
-            </p>
-          </div>
-
-          <div className={viewMode === "grid" ? "grid md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
-            {mockSlides.map((slide) => (
-              <div
-                key={slide.id}
-                className={`glass-card hover-lift ${
-                  viewMode === "list" ? "flex items-center gap-6" : ""
-                }`}
-              >
-                {/* Slide Thumbnail */}
-                <div className={`${
-                  viewMode === "list" ? "w-48 h-32" : "aspect-video"
-                } bg-muted rounded-lg mb-4 ${viewMode === "list" ? "mb-0" : ""} flex items-center justify-center`}>
-                  <div className="text-center text-muted-foreground">
-                    <Image className="w-8 h-8 mx-auto mb-2" />
-                    <p className="text-sm">Slide {slide.id}</p>
-                  </div>
-                </div>
-
-                {/* Slide Info */}
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold">Slide {slide.id}: {slide.title}</h3>
-                    <Badge 
-                      variant={slide.placeholders.every(p => p.status === "filled") ? "default" : "secondary"}
-                      className="glass"
-                    >
-                      {slide.placeholders.filter(p => p.status === "filled").length}/{slide.placeholders.length}
+          <div className="space-y-6">
+            <div className="text-center text-muted-foreground">
+              <p>Slide previews will be available in the full version</p>
+              <p className="text-sm mt-2">Currently showing placeholder data structure</p>
+            </div>
+            
+            {/* Show placeholder summary */}
+            <div className="grid gap-4">
+              {currentFile.placeholders.map((placeholder) => (
+                <div key={placeholder.id} className="glass-card p-4 hover-lift">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">{placeholder.key}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {placeholder.slideTitle} • {placeholder.type}
+                      </p>
+                    </div>
+                    <Badge variant={updates[placeholder.id]?.value ? "default" : "outline"}>
+                      {updates[placeholder.id]?.value ? "Filled" : "Empty"}
                     </Badge>
                   </div>
-
-                  <div className="space-y-2">
-                    {slide.placeholders.map((placeholder, index) => (
-                      <div key={index} className="flex items-center gap-2 text-sm">
-                        {placeholder.type === "text" ? (
-                          <FileText className="w-3 h-3 text-muted-foreground" />
-                        ) : (
-                          <Image className="w-3 h-3 text-muted-foreground" />
-                        )}
-                        <span className="flex-1">{placeholder.key}</span>
-                        {placeholder.status === "filled" ? (
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                        ) : (
-                          <AlertCircle className="w-3 h-3 text-yellow-500" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  {updates[placeholder.id]?.value && (
+                    <div className="mt-3 p-3 bg-muted/20 rounded-lg">
+                      <p className="text-sm">
+                        {placeholder.type === 'image' ? 'Image uploaded' : updates[placeholder.id].value}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
