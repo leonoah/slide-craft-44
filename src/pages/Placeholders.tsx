@@ -16,7 +16,11 @@ const Placeholders = () => {
   
   const { currentFile, getPlaceholderStatus } = usePPTXStore();
 
+  console.log('Placeholders component - currentFile:', currentFile);
+  console.log('Placeholders component - placeholders:', currentFile?.placeholders);
+
   if (!currentFile) {
+    console.log('No currentFile found, redirecting to upload...');
     navigate('/');
     return null;
   }

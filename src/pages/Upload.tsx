@@ -26,9 +26,12 @@ const Upload = () => {
     setIsUploading(true);
     
     try {
+      console.log('Starting PPTX parsing...');
       const pptxData = await pptxParser.parseFile(file);
+      console.log('PPTX parsing completed:', pptxData);
       
       setCurrentFile(pptxData);
+      console.log('Store updated with PPTX data');
       
       toast({
         title: "File uploaded successfully!",
