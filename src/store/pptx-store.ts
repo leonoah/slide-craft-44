@@ -55,8 +55,22 @@ export const usePPTXStore = create<PPTXStore>()(
       name: 'pptx-store',
       partialize: (state) => ({ 
         currentFile: state.currentFile,
-        updates: state.updates 
-      })
+        updates: Object.fromEntries(
+          Object.entries(state.updates).map(([key, update]) => [
+            key,
+            update.type === 'image' ? { ...update, value: '' } : update
+          ])
+        )
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Handle quota exceeded gracefully
+        try {
+          return state;
+        } catch (error) {
+          console.warn('Storage rehydration failed:', error);
+          return undefined;
+        }
+      }
     }
   )
 );
