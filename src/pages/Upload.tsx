@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Upload as UploadIcon, FileText, Image, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { pptxParser } from "@/lib/pptx-parser";
+import { usePPTXStore } from "@/store/pptx-store";
 
 const Upload = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setCurrentFile } = usePPTXStore();
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.match(/\.(pptx|pot)$/i)) {
@@ -22,19 +25,30 @@ const Upload = () => {
 
     setIsUploading(true);
     
-    // Simulate upload process
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    toast({
-      title: "File uploaded successfully!",
-      description: "Scanning for placeholders...",
-    });
+    try {
+      const pptxData = await pptxParser.parseFile(file);
+      
+      setCurrentFile(pptxData);
+      
+      toast({
+        title: "File uploaded successfully!",
+        description: `Found ${pptxData.placeholders.length} placeholders in ${pptxData.slideCount} slides`,
+      });
 
-    // Navigate to placeholders page
-    setTimeout(() => {
-      navigate('/placeholders');
-    }, 1000);
-  }, [navigate, toast]);
+      setTimeout(() => {
+        navigate('/placeholders');
+      }, 1000);
+    } catch (error) {
+      console.error('Error parsing PPTX:', error);
+      toast({
+        title: "Error processing file",
+        description: "Unable to parse the PowerPoint file. Please try another file.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [navigate, toast, setCurrentFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
