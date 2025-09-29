@@ -102,7 +102,9 @@ export class PPTXParser {
       // 1) Text runs like <a:t>...{{title}}...</a:t>
       if (doc) {
         const allTextNodes = Array.from(doc.getElementsByTagName('*')).filter(el => el.localName === 't');
-        const textContent = allTextNodes.map(el => el.textContent || '').join(' ');
+        // Join without adding separator so placeholder tokens split across runs
+        // (e.g. "{{ti" + "tle}}") are preserved as "{{title}}".
+        const textContent = allTextNodes.map(el => el.textContent || '').join('');
         const textMatches = textContent.match(/\{\{([^}]+)\}\}/g) || [];
         console.log(`PPTXParser: [a:t] found ${textMatches.length} placeholders in slide ${index + 1}:`, textMatches);
         textMatches.forEach(m => pushUnique(index, m.replace(/[{}]/g, '')));
