@@ -11,7 +11,7 @@ const Upload = () => {
   const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { setCurrentFile } = usePPTXStore();
+  const { setCurrentFile, setOriginalArrayBuffer } = usePPTXStore();
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!file.name.match(/\.(pptx|pot)$/i)) {
@@ -27,6 +27,8 @@ const Upload = () => {
     
     try {
       console.log('Starting PPTX parsing...');
+      const arrayBuffer = await file.arrayBuffer();
+      setOriginalArrayBuffer(arrayBuffer);
       const pptxData = await pptxParser.parseFile(file);
       console.log('PPTX parsing completed:', pptxData);
       

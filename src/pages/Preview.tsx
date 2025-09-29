@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePPTXStore } from "@/store/pptx-store";
-import PptxGenJS from "pptxgenjs";
+import JSZip from "jszip";
 import jsPDF from "jspdf";
 
 const Preview = () => {
@@ -13,7 +13,7 @@ const Preview = () => {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isExporting, setIsExporting] = useState(false);
-  const { currentFile, updates } = usePPTXStore();
+  const { currentFile, updates, originalArrayBuffer } = usePPTXStore();
 
   if (!currentFile) {
     navigate('/');
@@ -25,100 +25,162 @@ const Preview = () => {
   const handleExportPPTX = async () => {
     setIsExporting(true);
     try {
-      const pptx = new PptxGenJS();
+      if (!originalArrayBuffer) {
+        toast({
+          title: "Original file not available",
+          description: "Please re-upload your PPTX so we can fill placeholders in the original design.",
+          variant: "destructive",
+        });
+        return;
+      }
 
-      // Group placeholders by slide
-      const slideGroups = currentFile.placeholders.reduce((acc, placeholder) => {
-        const slideIndex = placeholder.slideIndex;
-        if (!acc[slideIndex]) acc[slideIndex] = [];
-        acc[slideIndex].push(placeholder);
-        return acc;
-      }, {} as Record<number, typeof currentFile.placeholders>);
+      const zip = await JSZip.loadAsync(originalArrayBuffer);
 
-      // Create slides with updated content
-      Object.entries(slideGroups).forEach(([_, placeholders]) => {
-        const slide = pptx.addSlide();
+      // Find slide files in correct order
+      const slideFiles = Object.keys(zip.files)
+        .filter((name) => /ppt\/slides\/slide\d+\.xml$/.test(name))
+        .sort((a, b) => {
+          const aNum = parseInt(a.match(/slide(\d+)\.xml$/)?.[1] || '0');
+          const bNum = parseInt(b.match(/slide(\d+)\.xml$/)?.[1] || '0');
+          return aNum - bNum;
+        });
 
-        // Add slide title if available
-        const firstPlaceholder = placeholders[0];
-        if (firstPlaceholder?.slideTitle) {
-          slide.addText(firstPlaceholder.slideTitle, {
-            x: 0.5,
-            y: 0.5,
-            w: 9,
-            h: 1,
-            fontSize: 24,
-            bold: true,
-            color: "363636",
+      // Build replacement maps from updates
+      const textMap = new Map<string, string>();
+      const imageMap = new Map<string, string>();
+      currentFile.placeholders.forEach((p) => {
+        const update = updates[p.id]?.value;
+        if (!update) return;
+        if (p.type === 'text') textMap.set(p.key, update);
+        if (p.type === 'image' && update.startsWith('data:image')) imageMap.set(p.key, update);
+      });
+
+      const dataURLToUint8Array = (dataUrl: string): Uint8Array => {
+        const base64 = dataUrl.split(',')[1];
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+      };
+
+      const normalizeMediaPath = (slidePath: string, target: string): string => {
+        // slidePath: ppt/slides/slideN.xml
+        if (target.startsWith('../')) {
+          return 'ppt/' + target.replace(/^\.\.\//, '');
+        }
+        if (target.startsWith('media/')) {
+          return 'ppt/' + target;
+        }
+        if (target.startsWith('/ppt/')) {
+          return target.replace(/^\//, '');
+        }
+        // Fallback to relative to slides folder
+        const base = 'ppt/slides/';
+        return base + target;
+      };
+
+      for (let i = 0; i < slideFiles.length; i++) {
+        const slidePath = slideFiles[i];
+        const xmlText = await zip.file(slidePath)!.async('text');
+
+        const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+
+        // Replace text placeholders inside <a:t>
+        if (textMap.size > 0) {
+          const allEls = Array.from(doc.getElementsByTagName('*')) as Element[];
+          const tNodes = allEls.filter((el) => el.localName === 't');
+          tNodes.forEach((t) => {
+            let content = t.textContent || '';
+            textMap.forEach((val, key) => {
+              const token = `{{${key}}}`;
+              if (content?.includes(token)) {
+                content = content.split(token).join(val);
+              }
+            });
+            t.textContent = content;
           });
         }
 
-        // Dynamic y-positioning
-        let y = firstPlaceholder?.slideTitle ? 1.6 : 0.8;
+        // Replace image content for picture shapes matching {{image:*}} keys
+        if (imageMap.size > 0) {
+          const allEls = Array.from(doc.getElementsByTagName('*')) as Element[];
+          const cNvPrEls = allEls.filter((el) => el.localName === 'cNvPr');
 
-        placeholders.forEach((placeholder) => {
-          const update = updates[placeholder.id]?.value;
+          for (const cNvPr of cNvPrEls) {
+            const nameAttr = cNvPr.getAttribute('name') || '';
+            const descrAttr = cNvPr.getAttribute('descr') || '';
+            const combined = `${nameAttr} ${descrAttr}`;
 
-          if (placeholder.type === 'text') {
-            const textValue = update || `[${placeholder.key}]`;
-            slide.addText(`${placeholder.key}: ${textValue}`, {
-              x: 0.5,
-              y,
-              w: 9,
-              h: 0.7,
-              fontSize: 14,
-              color: "363636",
-            });
-            y += 0.6;
-          } else if (placeholder.type === 'image') {
-            // If image exists, embed it; otherwise show placeholder text
-            if (update && update.startsWith('data:image')) {
-              // Optional label
-              slide.addText(`${placeholder.key}:`, {
-                x: 0.5,
-                y,
-                w: 9,
-                h: 0.5,
-                fontSize: 12,
-                color: "363636",
-                italic: true,
-              });
-              y += 0.4;
-
-              // Add image (fit within slide width)
-              slide.addImage({ data: update, x: 0.5, y, w: 5.5, h: 3.2 });
-              y += 3.6; // spacing after image
-            } else {
-              slide.addText(`${placeholder.key}: [Image placeholder]`, {
-                x: 0.5,
-                y,
-                w: 9,
-                h: 0.7,
-                fontSize: 14,
-                color: "777777",
-                italic: true,
-              });
-              y += 0.6;
+            // Find which image key this shape corresponds to
+            let matchedKey: string | null = null;
+            for (const key of imageMap.keys()) {
+              const token = `{{${key}}}`;
+              if (combined.includes(token)) {
+                matchedKey = key;
+                break;
+              }
             }
-          }
-        });
-      });
+            if (!matchedKey) continue;
 
-      // Save using original filename
-      const fileName = currentFile.filename.endsWith('.pptx')
-        ? currentFile.filename
-        : `${currentFile.filename}.pptx`;
-      await pptx.writeFile({ fileName });
+            // Traverse up to the <p:pic> element
+            let node: Element | null = cNvPr;
+            let picEl: Element | null = null;
+            for (let up = 0; up < 6 && node; up++) {
+              if (node.localName === 'pic') { picEl = node; break; }
+              node = node.parentElement;
+            }
+            if (!picEl) continue;
+
+            // Find <a:blip r:embed="rIdX">
+            const blip = Array.from(picEl.getElementsByTagName('*')).find((el) => el.localName === 'blip') as Element | undefined;
+            const rId = blip?.getAttribute('r:embed') || blip?.getAttribute('embed') || null;
+            if (!rId) continue;
+
+            // Read rels file
+            const slideNum = parseInt(slidePath.match(/slide(\d+)\.xml$/)?.[1] || '0');
+            const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+            const relsXml = await zip.file(relsPath)?.async('text');
+            if (!relsXml) continue;
+
+            const relsDoc = new DOMParser().parseFromString(relsXml, 'application/xml');
+            const relationships = Array.from(relsDoc.getElementsByTagName('Relationship')) as Element[];
+            const rel = relationships.find((r) => r.getAttribute('Id') === rId);
+            const target = rel?.getAttribute('Target');
+            if (!target) continue;
+
+            const mediaPath = normalizeMediaPath(slidePath, target);
+            const dataUrl = imageMap.get(matchedKey)!;
+            const bytes = dataURLToUint8Array(dataUrl);
+            zip.file(mediaPath, bytes);
+          }
+
+          // After image replacements, serialize slide XML back (even if unchanged for safety)
+        }
+
+        // Write back updated slide XML
+        const updatedXml = new XMLSerializer().serializeToString(doc);
+        zip.file(slidePath, updatedXml);
+      }
+
+      // Generate updated PPTX preserving original name
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = currentFile.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
       toast({
-        title: "PPTX Export completed",
-        description: "PowerPoint file exported successfully",
+        title: "Export completed",
+        description: "Your original PPTX was filled and downloaded.",
       });
     } catch (error) {
-      console.error('PPTX Export error:', error);
+      console.error('PPTX fill export error:', error);
       toast({
         title: "Export failed",
-        description: "Unable to export PPTX file",
+        description: "Unable to fill placeholders in the original PPTX.",
         variant: "destructive",
       });
     } finally {

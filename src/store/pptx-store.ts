@@ -10,8 +10,10 @@ interface PlaceholderUpdate {
 
 interface PPTXStore {
   currentFile: PPTXData | null;
+  originalArrayBuffer: ArrayBuffer | null;
   updates: Record<string, PlaceholderUpdate>;
   setCurrentFile: (file: PPTXData) => void;
+  setOriginalArrayBuffer: (buf: ArrayBuffer) => void;
   updatePlaceholder: (id: string, value: string, type: 'text' | 'image') => void;
   getPlaceholderValue: (id: string) => string | undefined;
   getPlaceholderStatus: (id: string) => 'empty' | 'filled';
@@ -22,9 +24,12 @@ export const usePPTXStore = create<PPTXStore>()(
   persist(
     (set, get) => ({
       currentFile: null,
+      originalArrayBuffer: null,
       updates: {},
 
       setCurrentFile: (file) => set({ currentFile: file, updates: {} }),
+
+      setOriginalArrayBuffer: (buf) => set({ originalArrayBuffer: buf }),
 
       updatePlaceholder: (id, value, type) => {
         set((state) => ({
@@ -44,7 +49,7 @@ export const usePPTXStore = create<PPTXStore>()(
         return update && update.value ? 'filled' : 'empty';
       },
 
-      clearData: () => set({ currentFile: null, updates: {} })
+      clearData: () => set({ currentFile: null, originalArrayBuffer: null, updates: {} })
     }),
     {
       name: 'pptx-store',
