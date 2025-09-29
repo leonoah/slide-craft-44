@@ -51,7 +51,13 @@ const Preview = () => {
       currentFile.placeholders.forEach((p) => {
         const update = updates[p.id]?.value;
         if (!update) return;
-        if (p.type === 'text') textMap.set(p.key, update);
+        if (p.type === 'text') {
+          textMap.set(p.key, update);
+          const trimmedKey = p.key.trim();
+          if (trimmedKey && trimmedKey !== p.key) {
+            textMap.set(trimmedKey, update);
+          }
+        }
         if (p.type === 'image' && update.startsWith('data:image')) imageMap.set(p.key, update);
       });
 
@@ -86,21 +92,93 @@ const Preview = () => {
 
         const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
 
-        // Replace text placeholders inside <a:t>
-        if (textMap.size > 0) {
+        const replaceTextPlaceholders = () => {
+          if (textMap.size === 0) return;
+
           const allEls = Array.from(doc.getElementsByTagName('*')) as Element[];
-          const tNodes = allEls.filter((el) => el.localName === 't');
-          tNodes.forEach((t) => {
-            let content = t.textContent || '';
-            textMap.forEach((val, key) => {
-              const token = `{{${key}}}`;
-              if (content?.includes(token)) {
-                content = content.split(token).join(val);
-              }
-            });
-            t.textContent = content;
+          const textNodes = allEls.filter((el) => el.localName === 't');
+          if (textNodes.length === 0) return;
+
+          type TextRun = {
+            node: Element;
+            text: string;
+            start: number;
+            end: number;
+          };
+
+          const runs: TextRun[] = textNodes.map((node) => ({
+            node,
+            text: node.textContent || '',
+            start: 0,
+            end: 0,
+          }));
+
+          let cursor = 0;
+          runs.forEach((run) => {
+            run.start = cursor;
+            cursor += run.text.length;
+            run.end = cursor;
           });
-        }
+
+          const replaceToken = (token: string, replacement: string) => {
+            if (!token) return;
+
+            let combined = runs.map((run) => run.text).join('');
+            if (!combined.includes(token)) return;
+
+            let searchIndex = 0;
+            while (searchIndex <= combined.length) {
+              const matchIndex = combined.indexOf(token, searchIndex);
+              if (matchIndex === -1) break;
+              const matchEnd = matchIndex + token.length;
+
+              const startRunIndex = runs.findIndex((run) => run.end > matchIndex);
+              if (startRunIndex === -1) break;
+
+              let endRunIndex = startRunIndex;
+              while (endRunIndex < runs.length && runs[endRunIndex].start < matchEnd) {
+                endRunIndex++;
+              }
+              endRunIndex--;
+              if (endRunIndex < startRunIndex) {
+                searchIndex = matchEnd;
+                continue;
+              }
+
+              const startRun = runs[startRunIndex];
+              const endRun = runs[endRunIndex];
+
+              const prefix = startRun.text.slice(0, matchIndex - startRun.start);
+              const suffix = endRun.text.slice(matchEnd - endRun.start);
+
+              startRun.text = `${prefix}${replacement}${suffix}`;
+              startRun.node.textContent = startRun.text;
+
+              for (let idx = startRunIndex + 1; idx <= endRunIndex; idx++) {
+                runs[idx].text = '';
+                runs[idx].node.textContent = '';
+              }
+
+              startRun.end = startRun.start + startRun.text.length;
+              let prevEnd = startRun.end;
+              for (let idx = startRunIndex + 1; idx < runs.length; idx++) {
+                runs[idx].start = prevEnd;
+                prevEnd += runs[idx].text.length;
+                runs[idx].end = prevEnd;
+              }
+
+              combined = runs.map((run) => run.text).join('');
+              searchIndex = matchIndex + replacement.length;
+            }
+          };
+
+          textMap.forEach((val, key) => {
+            const token = `{{${key}}}`;
+            replaceToken(token, val);
+          });
+        };
+
+        replaceTextPlaceholders();
 
         // Replace image content for picture shapes matching {{image:*}} keys
         if (imageMap.size > 0) {
