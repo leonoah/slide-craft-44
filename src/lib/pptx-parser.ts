@@ -58,44 +58,62 @@ export class PPTXParser {
 
   private extractPlaceholders(): Placeholder[] {
     const placeholders: Placeholder[] = [];
+    const seen = new Set<string>();
     console.log('PPTXParser: Starting placeholder extraction from', this.slideTexts.length, 'slides');
-    
+
+    const pushUnique = (slideIndex: number, key: string) => {
+      const type: 'text' | 'image' = key.startsWith('image:') ? 'image' : 'text';
+      const signature = `${slideIndex}-${type}-${key}`;
+      if (seen.has(signature)) return;
+      seen.add(signature);
+      placeholders.push({
+        id: `${type}-${slideIndex}-${placeholders.length}`,
+        key,
+        type,
+        slideIndex,
+        status: 'empty',
+        slideTitle: `Slide ${slideIndex + 1}`,
+      });
+    };
+
     this.slideTexts.forEach((slideContent, index) => {
       console.log(`PPTXParser: Processing slide ${index + 1}, content length:`, slideContent.length);
-      
-      // Extract text placeholders like {{title}}, {{subtitle}}
-      const textMatches = slideContent.match(/\{\{([^}]+)\}\}/g) || [];
-      console.log(`PPTXParser: Found ${textMatches.length} text placeholders in slide ${index + 1}:`, textMatches);
-      
-      textMatches.forEach((match, matchIndex) => {
-        const key = match.replace(/[{}]/g, '');
-        if (!key.startsWith('image:')) {
-          placeholders.push({
-            id: `text-${index}-${matchIndex}`,
-            key,
-            type: 'text',
-            slideIndex: index,
-            status: 'empty',
-            slideTitle: `Slide ${index + 1}`
-          });
-        }
-      });
 
-      // Extract image placeholders like {{image:hero}}
-      const imageMatches = slideContent.match(/\{\{image:([^}]+)\}\}/g) || [];
-      console.log(`PPTXParser: Found ${imageMatches.length} image placeholders in slide ${index + 1}:`, imageMatches);
-      
-      imageMatches.forEach((match, matchIndex) => {
-        const key = match.replace(/[{}]/g, '');
-        placeholders.push({
-          id: `image-${index}-${matchIndex}`,
-          key,
-          type: 'image',
-          slideIndex: index,
-          status: 'empty',
-          slideTitle: `Slide ${index + 1}`
+      // Parse XML DOM to inspect text nodes and shape metadata (name/descr)
+      let doc: Document | null = null;
+      try {
+        doc = new DOMParser().parseFromString(slideContent, 'application/xml');
+      } catch (e) {
+        console.warn('PPTXParser: Failed to parse XML for slide', index + 1, e);
+      }
+
+      // 1) Text runs like <a:t>...{{title}}...</a:t>
+      if (doc) {
+        const allTextNodes = Array.from(doc.getElementsByTagName('*')).filter(el => el.localName === 't');
+        const textContent = allTextNodes.map(el => el.textContent || '').join(' ');
+        const textMatches = textContent.match(/\{\{([^}]+)\}\}/g) || [];
+        console.log(`PPTXParser: [a:t] found ${textMatches.length} placeholders in slide ${index + 1}:`, textMatches);
+        textMatches.forEach(m => pushUnique(index, m.replace(/[{}]/g, '')));
+
+        // 2) Shape and picture metadata: <p:cNvPr name="..." descr="...">
+        const allEls = Array.from(doc.getElementsByTagName('*')) as Element[];
+        const cNvPrEls = allEls.filter(el => el.localName === 'cNvPr');
+        cNvPrEls.forEach((el) => {
+          const nameAttr = el.getAttribute('name') || '';
+          const descrAttr = el.getAttribute('descr') || '';
+          const combined = [nameAttr, descrAttr].join(' ');
+          const matches = combined.match(/\{\{([^}]+)\}\}/g) || [];
+          if (matches.length) {
+            console.log(`PPTXParser: [cNvPr] found ${matches.length} placeholders in slide ${index + 1}:`, matches);
+          }
+          matches.forEach(m => pushUnique(index, m.replace(/[{}]/g, '')));
         });
-      });
+      } else {
+        // Fallback: regex over raw XML
+        const rawMatches = slideContent.match(/\{\{([^}]+)\}\}/g) || [];
+        console.log(`PPTXParser: [raw] found ${rawMatches.length} placeholders in slide ${index + 1}`);
+        rawMatches.forEach(m => pushUnique(index, m.replace(/[{}]/g, '')));
+      }
     });
 
     console.log('PPTXParser: Total placeholders found:', placeholders.length);
