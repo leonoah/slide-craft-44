@@ -1,42 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* iOS-26 Liquid Glass Design System */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors - soft, muted palette */
+    --background: 240 20% 98%;
+    --foreground: 240 20% 15%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
+    /* Glass morphism foundation */
+    --glass-background: 240 20% 98%;
+    --glass-foreground: 240 20% 15%;
+    --glass-border: 240 20% 90%;
+    
+    /* Primary - soft blue accent */
+    --primary: 213 93% 67%;
+    --primary-foreground: 240 20% 98%;
+    --primary-muted: 213 50% 90%;
+    
+    /* Secondary - subtle gray */
+    --secondary: 240 10% 94%;
+    --secondary-foreground: 240 20% 25%;
+    
+    /* Accent - vibrant highlight */
+    --accent: 213 93% 67%;
+    --accent-foreground: 240 20% 98%;
+    --accent-muted: 213 50% 95%;
+    
+    /* Muted tones */
+    --muted: 240 10% 96%;
+    --muted-foreground: 240 10% 50%;
+    
+    /* Interactive states */
+    --card: 240 20% 98%;
+    --card-foreground: 240 20% 15%;
+    --popover: 240 20% 98%;
+    --popover-foreground: 240 20% 15%;
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 240 20% 98%;
+    
+    /* Border and input */
+    --border: 240 20% 90%;
+    --input: 240 20% 95%;
+    --ring: 213 93% 67%;
+    
+    /* Glass effects */
+    --glass-opacity: 0.08;
+    --glass-blur: 20px;
+    --shadow-glass: 0 8px 32px rgba(31, 38, 135, 0.15);
+    --shadow-soft: 0 2px 16px rgba(31, 38, 135, 0.1);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(213 93% 67% / 0.9), hsl(213 93% 77% / 0.8));
+    --gradient-glass: linear-gradient(135deg, hsl(240 20% 98% / 0.12), hsl(240 20% 95% / 0.08));
+    --gradient-subtle: linear-gradient(180deg, hsl(240 20% 98%), hsl(240 15% 96%));
+    
+    /* Radius */
+    --radius: 1rem;
+    --radius-lg: 1.5rem;
+    --radius-xl: 2rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +128,94 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--gradient-subtle);
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* Glass morphism utilities */
+  .glass {
+    background: var(--gradient-glass);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid hsl(var(--border) / 0.2);
+    box-shadow: var(--shadow-glass);
+  }
+  
+  .glass-card {
+    @apply glass rounded-[var(--radius-lg)] p-6;
+  }
+  
+  .glass-button {
+    @apply glass rounded-[var(--radius)] px-6 py-3 font-medium transition-all duration-300;
+    @apply hover:shadow-lg hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  /* Premium animations */
+  .animate-fade-in {
+    animation: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .animate-scale-in {
+    animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  /* Hover micro-interactions */
+  .hover-lift {
+    @apply transition-all duration-300 hover:translate-y-[-2px] hover:shadow-lg;
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-[0_0_20px_hsl(var(--primary)_/_0.3)];
+  }
+}
+
+@layer utilities {
+  /* Custom keyframes */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Gradient text */
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
