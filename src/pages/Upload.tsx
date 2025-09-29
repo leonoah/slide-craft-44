@@ -134,9 +134,9 @@ const Upload = () => {
                   </div>
 
                   <div className="space-y-4">
-                    <label htmlFor="file-upload">
-                      <Button size="lg" className="glass-button hover-glow cursor-pointer">
-                        Choose File
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <Button size="lg" className="glass-button hover-glow" type="button" asChild>
+                        <span>Choose File</span>
                       </Button>
                     </label>
                     <input
