@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { usePPTXStore } from "@/store/pptx-store";
+import PptxGenJS from "pptxgenjs";
+import jsPDF from "jspdf";
 
 const Preview = () => {
   const navigate = useNavigate();
@@ -23,39 +25,77 @@ const Preview = () => {
   const handleExportPPTX = async () => {
     setIsExporting(true);
     try {
-      // Create a simple text file with the placeholder data for now
-      const exportData = {
-        filename: currentFile.filename,
-        slides: currentFile.slideCount,
-        placeholders: currentFile.placeholders.map(p => ({
-          key: p.key,
-          type: p.type,
-          slideIndex: p.slideIndex,
-          value: updates[p.id]?.value || '',
-          filled: !!updates[p.id]?.value
-        }))
-      };
-
-      const jsonString = JSON.stringify(exportData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const pptx = new PptxGenJS();
       
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${currentFile.filename.replace('.pptx', '')}_data.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Group placeholders by slide
+      const slideGroups = currentFile.placeholders.reduce((acc, placeholder) => {
+        const slideIndex = placeholder.slideIndex;
+        if (!acc[slideIndex]) {
+          acc[slideIndex] = [];
+        }
+        acc[slideIndex].push(placeholder);
+        return acc;
+      }, {} as Record<number, typeof currentFile.placeholders>);
+
+      // Create slides with updated content
+      Object.entries(slideGroups).forEach(([slideIndex, placeholders]) => {
+        const slide = pptx.addSlide();
+        
+        // Add slide title
+        const firstPlaceholder = placeholders[0];
+        if (firstPlaceholder?.slideTitle) {
+          slide.addText(firstPlaceholder.slideTitle, {
+            x: 0.5,
+            y: 0.5,
+            w: 9,
+            h: 1,
+            fontSize: 24,
+            bold: true,
+            color: "363636"
+          });
+        }
+
+        // Add placeholder content
+        placeholders.forEach((placeholder, index) => {
+          const value = updates[placeholder.id]?.value || `[${placeholder.key}]`;
+          const yPos = 1.5 + (index * 0.8);
+          
+          if (placeholder.type === 'text') {
+            slide.addText(`${placeholder.key}: ${value}`, {
+              x: 0.5,
+              y: yPos,
+              w: 9,
+              h: 0.7,
+              fontSize: 14,
+              color: "363636"
+            });
+          } else if (placeholder.type === 'image') {
+            slide.addText(`${placeholder.key}: ${value ? 'Image uploaded' : '[Image placeholder]'}`, {
+              x: 0.5,
+              y: yPos,
+              w: 9,
+              h: 0.7,
+              fontSize: 14,
+              color: "363636",
+              italic: true
+            });
+          }
+        });
+      });
+
+      // Save the presentation
+      const fileName = currentFile.filename.replace('.pptx', '') + '_updated.pptx';
+      await pptx.writeFile({ fileName });
 
       toast({
-        title: "Export completed",
-        description: "Placeholder data exported successfully",
+        title: "PPTX Export completed",
+        description: "PowerPoint file exported successfully",
       });
     } catch (error) {
+      console.error('PPTX Export error:', error);
       toast({
         title: "Export failed",
-        description: "Unable to export file",
+        description: "Unable to export PPTX file",
         variant: "destructive",
       });
     } finally {
@@ -66,39 +106,71 @@ const Preview = () => {
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      // Create a simple text summary for PDF export
-      const summary = `PowerPoint Placeholder Summary
+      const pdf = new jsPDF();
       
-Filename: ${currentFile.filename}
-Slides: ${currentFile.slideCount}
-Total Placeholders: ${currentFile.placeholders.length}
-Completed: ${filledCount}
-Remaining: ${currentFile.placeholders.length - filledCount}
-
-Placeholder Details:
-${currentFile.placeholders.map(p => 
-  `- ${p.key} (${p.type}) - Slide ${p.slideIndex + 1}: ${updates[p.id]?.value ? 'FILLED' : 'EMPTY'}`
-).join('\n')}`;
-
-      const blob = new Blob([summary], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
+      // Add title
+      pdf.setFontSize(20);
+      pdf.setFont(undefined, 'bold');
+      pdf.text('PowerPoint Placeholder Report', 20, 30);
       
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${currentFile.filename.replace('.pptx', '')}_summary.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Add file info
+      pdf.setFontSize(12);
+      pdf.setFont(undefined, 'normal');
+      pdf.text(`Filename: ${currentFile.filename}`, 20, 50);
+      pdf.text(`Slides: ${currentFile.slideCount}`, 20, 60);
+      pdf.text(`Total Placeholders: ${currentFile.placeholders.length}`, 20, 70);
+      pdf.text(`Completed: ${filledCount}`, 20, 80);
+      pdf.text(`Remaining: ${currentFile.placeholders.length - filledCount}`, 20, 90);
+      
+      // Add placeholder details
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Placeholder Details:', 20, 110);
+      
+      let yPos = 125;
+      pdf.setFont(undefined, 'normal');
+      pdf.setFontSize(10);
+      
+      currentFile.placeholders.forEach((placeholder) => {
+        if (yPos > 270) {
+          pdf.addPage();
+          yPos = 30;
+        }
+        
+        const status = updates[placeholder.id]?.value ? 'FILLED' : 'EMPTY';
+        const value = updates[placeholder.id]?.value || '[Empty]';
+        
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`${placeholder.key} (${placeholder.type}) - Slide ${placeholder.slideIndex + 1}:`, 20, yPos);
+        pdf.setFont(undefined, 'normal');
+        pdf.text(`Status: ${status}`, 25, yPos + 8);
+        
+        if (placeholder.type === 'text' && updates[placeholder.id]?.value) {
+          const lines = pdf.splitTextToSize(`Content: ${value}`, 160);
+          pdf.text(lines, 25, yPos + 16);
+          yPos += 16 + (lines.length * 5);
+        } else if (placeholder.type === 'image') {
+          pdf.text(`Content: ${status === 'FILLED' ? 'Image uploaded' : 'No image'}`, 25, yPos + 16);
+          yPos += 24;
+        } else {
+          yPos += 20;
+        }
+        
+        yPos += 5; // spacing between items
+      });
+      
+      // Save the PDF
+      const fileName = currentFile.filename.replace('.pptx', '') + '_report.pdf';
+      pdf.save(fileName);
 
       toast({
-        title: "Export completed",
-        description: "Summary exported successfully",
+        title: "PDF Export completed",
+        description: "PDF report exported successfully",
       });
     } catch (error) {
+      console.error('PDF Export error:', error);
       toast({
         title: "Export failed",
-        description: "Unable to export summary",
+        description: "Unable to export PDF file",
         variant: "destructive",
       });
     } finally {
@@ -157,7 +229,7 @@ ${currentFile.placeholders.map(p =>
                 className="glass-button hover-glow"
               >
                 <Download className="w-4 h-4 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export Data (JSON)'}
+                {isExporting ? 'Exporting...' : 'Export PPTX'}
               </Button>
               
               <Button 
@@ -167,7 +239,7 @@ ${currentFile.placeholders.map(p =>
                 className="glass-button"
               >
                 <FileText className="w-4 h-4 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export Summary (TXT)'}
+                {isExporting ? 'Exporting...' : 'Export PDF'}
               </Button>
             </div>
           </div>
