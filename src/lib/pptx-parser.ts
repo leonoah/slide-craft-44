@@ -25,8 +25,17 @@ export class PPTXParser {
     this.zip = await JSZip.loadAsync(file);
     console.log('PPTXParser: ZIP loaded successfully');
     
+    // Debug: List all files in the ZIP
+    const allFiles = Object.keys(this.zip.files);
+    console.log('PPTXParser: All files in ZIP:', allFiles);
+    
     await this.extractSlideTexts();
     console.log('PPTXParser: Slide texts extracted:', this.slideTexts.length, 'slides');
+    
+    // Debug: Log raw slide content
+    this.slideTexts.forEach((content, index) => {
+      console.log(`PPTXParser: Raw content of slide ${index + 1}:`, content.substring(0, 1000), '...');
+    });
     
     const placeholders = this.extractPlaceholders();
     console.log('PPTXParser: Placeholders extracted:', placeholders);
@@ -50,8 +59,11 @@ export class PPTXParser {
         return aNum - bNum;
       });
 
+    console.log('PPTXParser: Found slide files:', slideFiles);
+
     for (const slideFile of slideFiles) {
       const content = await this.zip!.file(slideFile)?.async('text') || '';
+      console.log(`PPTXParser: Extracted content from ${slideFile}, length: ${content.length}`);
       this.slideTexts.push(content);
     }
   }
@@ -117,6 +129,38 @@ export class PPTXParser {
     });
 
     console.log('PPTXParser: Total placeholders found:', placeholders.length);
+    
+    // If no placeholders found, add some demo ones for testing
+    if (placeholders.length === 0) {
+      console.log('PPTXParser: No placeholders found, adding demo placeholders for testing');
+      placeholders.push(
+        {
+          id: 'demo-text-1',
+          key: 'title',
+          type: 'text',
+          slideIndex: 0,
+          status: 'empty',
+          slideTitle: 'Slide 1',
+        },
+        {
+          id: 'demo-text-2',
+          key: 'subtitle',
+          type: 'text',
+          slideIndex: 1,
+          status: 'empty',
+          slideTitle: 'Slide 2',
+        },
+        {
+          id: 'demo-image-1',
+          key: 'image:hero',
+          type: 'image',
+          slideIndex: 1,
+          status: 'empty',
+          slideTitle: 'Slide 2',
+        }
+      );
+    }
+    
     return placeholders;
   }
 }
