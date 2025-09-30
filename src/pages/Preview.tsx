@@ -371,29 +371,29 @@ const Preview = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border/50 bg-background/80 backdrop-blur-xl sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/placeholders')}
-                className="glass-button hover-glow"
+                className="glass-button hover-glow flex-shrink-0"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Editor
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back</span>
               </Button>
               
-              <div>
-                <h1 className="text-xl font-bold gradient-text">Preview & Export</h1>
-                <p className="text-sm text-muted-foreground">
-                  {currentFile.filename} • {currentFile.slideCount} slides • {filledCount}/{currentFile.placeholders.length} completed
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm sm:text-lg md:text-xl font-bold gradient-text truncate">Preview & Export</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  {currentFile.slideCount} slides • {filledCount}/{currentFile.placeholders.length} done
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden sm:flex items-center gap-1 bg-muted/50 rounded-lg p-1">
                 <Button
                   variant={viewMode === "grid" ? "default" : "ghost"}
                   size="sm"
@@ -415,20 +415,22 @@ const Preview = () => {
               <Button 
                 onClick={handleExportPPTX} 
                 disabled={isExporting}
-                className="glass-button hover-glow"
+                className="glass-button hover-glow text-xs sm:text-sm"
+                size="sm"
               >
-                <Download className="w-4 h-4 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export PPTX'}
+                <Download className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export PPTX'}</span>
               </Button>
               
               <Button 
                 onClick={handleExportPDF} 
                 variant="outline" 
                 disabled={isExporting}
-                className="glass-button"
+                className="glass-button text-xs sm:text-sm"
+                size="sm"
               >
-                <FileText className="w-4 h-4 mr-2" />
-                {isExporting ? 'Exporting...' : 'Export PDF'}
+                <FileText className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'PDF'}</span>
               </Button>
             </div>
           </div>
@@ -448,20 +450,20 @@ const Preview = () => {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6">
         {/* Main Content */}
         <div className="animate-slide-up">
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div className="text-center text-muted-foreground">
-              <p>Slide previews will be available in the full version</p>
-              <p className="text-sm mt-2">Currently showing placeholder data structure</p>
+              <p className="text-sm sm:text-base">Slide previews will be available in the full version</p>
+              <p className="text-xs sm:text-sm mt-2">Currently showing placeholder data structure</p>
             </div>
             
             {/* Show placeholder summary */}
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {currentFile.placeholders.map((placeholder) => (
-                <div key={placeholder.id} className="glass-card p-4 hover-lift">
-                  <div className="flex items-center justify-between">
+                <div key={placeholder.id} className="glass-card p-3 sm:p-4 hover-lift">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <h3 className="font-medium">{placeholder.key}</h3>
                       <p className="text-sm text-muted-foreground">

@@ -83,20 +83,20 @@ const Upload = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-2xl">
         {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="flex items-center justify-center mb-6">
-            <div className="glass-card inline-flex items-center gap-3 px-6 py-3">
-              <Sparkles className="w-6 h-6 text-primary" />
-              <span className="font-semibold text-lg">PowerPoint Editor</span>
+        <div className="text-center mb-8 sm:mb-12 animate-fade-in">
+          <div className="flex items-center justify-center mb-4 sm:mb-6">
+            <div className="glass-card inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-6 py-2 sm:py-3">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              <span className="font-semibold text-base sm:text-lg">PowerPoint Editor</span>
             </div>
           </div>
-          <h1 className="text-5xl font-bold mb-4 gradient-text">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 sm:mb-4 gradient-text px-4">
             Transform Your Presentations
           </h1>
-          <p className="text-xl text-muted-foreground max-w-lg mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-lg mx-auto leading-relaxed px-4">
             Upload your PowerPoint file and we'll automatically detect placeholders for easy content management
           </p>
         </div>
@@ -113,24 +113,24 @@ const Upload = () => {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
-            <div className="text-center p-12">
+            <div className="text-center p-6 sm:p-8 md:p-12">
               {isUploading ? (
                 <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto rounded-full glass border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full glass border-4 border-primary/20 border-t-primary animate-spin" />
                   <div>
-                    <h3 className="text-xl font-semibold mb-2">Processing your file...</h3>
-                    <p className="text-muted-foreground">This might take a moment</p>
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2">Processing your file...</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">This might take a moment</p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="w-20 h-20 mx-auto rounded-[var(--radius-lg)] glass flex items-center justify-center">
-                    <UploadIcon className="w-10 h-10 text-primary" />
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-[var(--radius-lg)] glass flex items-center justify-center">
+                    <UploadIcon className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
                   </div>
                   
                   <div>
-                    <h3 className="text-2xl font-semibold mb-2">Drop your PowerPoint file here</h3>
-                    <p className="text-muted-foreground mb-8">
+                    <h3 className="text-xl sm:text-2xl font-semibold mb-2">Drop your PowerPoint file here</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
                       Supports .pptx and .pot files up to 50MB
                     </p>
                   </div>
@@ -160,23 +160,23 @@ const Upload = () => {
         </div>
 
         {/* Features */}
-        <div className="grid md:grid-cols-2 gap-6 mt-12 animate-fade-in">
-          <div className="glass-card text-center space-y-4 hover-lift">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-primary/10 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-primary" />
+        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 mt-8 sm:mt-12 animate-fade-in">
+          <div className="glass-card text-center space-y-3 sm:space-y-4 hover-lift p-4 sm:p-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
-            <h3 className="font-semibold">Smart Text Detection</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="font-semibold text-sm sm:text-base">Smart Text Detection</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Automatically finds and organizes text placeholders like {"{{title}}"} and {"{{subtitle}}"}
             </p>
           </div>
           
-          <div className="glass-card text-center space-y-4 hover-lift">
-            <div className="w-12 h-12 mx-auto rounded-lg bg-primary/10 flex items-center justify-center">
-              <Image className="w-6 h-6 text-primary" />
+          <div className="glass-card text-center space-y-3 sm:space-y-4 hover-lift p-4 sm:p-6">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto rounded-lg bg-primary/10 flex items-center justify-center">
+              <Image className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
             </div>
-            <h3 className="font-semibold">Image Placeholders</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="font-semibold text-sm sm:text-base">Image Placeholders</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Identifies image slots like {"{{image:hero}}"} for easy drag-and-drop replacement
             </p>
           </div>
