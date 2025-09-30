@@ -1,7 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ArrowLeft, Save, Upload, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +20,7 @@ export const PlaceholderEditor = ({ placeholderId, onClose }: PlaceholderEditorP
   
   const [value, setValue] = useState(currentValue);
   const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!placeholder) {
     return null;
@@ -67,8 +67,14 @@ export const PlaceholderEditor = ({ placeholderId, onClose }: PlaceholderEditorP
     const file = e.target.files?.[0];
     if (file) {
       handleImageUpload(file);
+      // Reset the input value so the same file can be reselected if needed
+      e.target.value = "";
     }
   }, [handleImageUpload]);
+
+  const openFileDialog = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -131,19 +137,28 @@ export const PlaceholderEditor = ({ placeholderId, onClose }: PlaceholderEditorP
               {value ? (
                 <div className="space-y-4">
                   <div className="aspect-video rounded-lg overflow-hidden border">
-                    <img 
-                      src={value} 
-                      alt="Preview" 
+                    <img
+                      src={value}
+                      alt="Preview"
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => setValue('')}
-                  >
-                    Remove Image
-                  </Button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={openFileDialog}
+                    >
+                      Replace Image
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setValue('')}
+                    >
+                      Remove Image
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div
@@ -161,17 +176,15 @@ export const PlaceholderEditor = ({ placeholderId, onClose }: PlaceholderEditorP
                   <p className="text-sm text-muted-foreground mb-4">
                     Supports JPG, PNG, WebP up to 5MB
                   </p>
-                  <label htmlFor="image-upload">
-                    <Button variant="outline" className="cursor-pointer">
-                      Choose File
-                    </Button>
-                  </label>
+                  <Button variant="outline" className="cursor-pointer" onClick={openFileDialog}>
+                    Choose File
+                  </Button>
                   <input
-                    id="image-upload"
                     type="file"
                     accept="image/*"
                     onChange={handleFileSelect}
                     className="hidden"
+                    ref={fileInputRef}
                   />
                 </div>
               )}
